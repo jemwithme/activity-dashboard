@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+events.db
+events.db-shm
+events.db-wal

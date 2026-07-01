@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Activity Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Arial, sans-serif;
+      color: #24303a;
+      background: #f3f5f7;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1200px; margin: auto; padding: 24px; }
+    header { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
+    h1 { margin: 0 0 6px; font-size: 1.8rem; }
+    h2 { margin-top: 28px; }
+    .muted { color: #66717b; margin: 0; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 14px;
+      margin: 22px 0;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0 0 22px;
+    }
+    .legend-item {
+      background: white;
+      border: 1px solid #dfe4e8;
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .card, .table-wrap {
+      background: white;
+      border: 1px solid #dfe4e8;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
+    }
+    .card { padding: 18px; }
+    .card .value { display: block; font-size: 2rem; font-weight: bold; margin-top: 6px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid #e7eaed; }
+    th { background: #f8f9fa; font-size: .85rem; text-transform: uppercase; color: #5b6670; }
+    tr:last-child td { border-bottom: 0; }
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: .8rem;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .green { color: #176b38; background: #dff4e7; }
+    .amber { color: #815500; background: #fff0c2; }
+    .red { color: #9b2d30; background: #fde3e3; }
+    .error { color: #9b2d30; font-weight: bold; }
+    code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+    @media (max-width: 700px) {
+      main { padding: 14px; }
+      header { align-items: start; flex-direction: column; }
+      .cards { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Activity Dashboard</h1>
+      <p class="muted">Monitor switch activity and identify unusual periods of inactivity or continuous use.</p>
+    </div>
+    <p id="refresh-status" class="muted">Loading…</p>
+  </header>
+
+  <section class="cards" aria-label="Node totals">
+    <div class="card">Total nodes <span class="value" id="total-nodes">—</span></div>
+    <div class="card">Green <span class="value" id="green-count">—</span></div>
+    <div class="card">Amber <span class="value" id="amber-count">—</span></div>
+    <div class="card">Red <span class="value" id="red-count">—</span></div>
+  </section>
+
+  <section class="legend" aria-label="Flag duration guide">
+    <div class="legend-item"><span class="status green">Green</span> Under 2 minutes</div>
+    <div class="legend-item"><span class="status amber">Amber</span> 2–3 minutes</div>
+    <div class="legend-item"><span class="status red">Red</span> Over 3 minutes</div>
+  </section>
+
+  <h2>Nodes</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Node ID</th><th>Flag</th><th>Level</th><th>Flag duration</th>
+          <th>Last event</th><th>Last seen</th><th>Event count</th>
+        </tr>
+      </thead>
+      <tbody id="nodes-body"></tbody>
+    </table>
+  </div>
+
+  <h2>Recent events</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Timestamp</th><th>Node ID</th><th>Event type</th><th>Raw payload</th></tr>
+      </thead>
+      <tbody id="events-body"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  const escapeHtml = (value) => {
+    const div = document.createElement("div");
+    div.textContent = value == null ? "" : String(value);
+    return div.innerHTML;
+  };
+
+  const displayTime = (value) => value ? new Date(value).toLocaleString() : "—";
+
+  async function refreshDashboard() {
+    const refreshStatus = document.getElementById("refresh-status");
+    try {
+      const [summaryResponse, eventsResponse] = await Promise.all([
+        fetch("/nodes/status", { cache: "no-store" }),
+        fetch("/events?limit=30", { cache: "no-store" })
+      ]);
+      if (!summaryResponse.ok || !eventsResponse.ok) throw new Error("API request failed");
+
+      const summary = await summaryResponse.json();
+      const recent = await eventsResponse.json();
+
+      document.getElementById("total-nodes").textContent = summary.total_nodes;
+      document.getElementById("green-count").textContent = summary.green;
+      document.getElementById("amber-count").textContent = summary.amber;
+      document.getElementById("red-count").textContent = summary.red;
+
+      document.getElementById("nodes-body").innerHTML = summary.nodes.length
+        ? summary.nodes.map(node => `
+          <tr>
+            <td>${escapeHtml(node.node_id)}</td>
+            <td>${escapeHtml(node.flag_label)}</td>
+            <td><span class="status ${escapeHtml(node.status)}">${escapeHtml(node.status)}</span></td>
+            <td>${escapeHtml(node.flag_duration)}</td>
+            <td>${escapeHtml(node.last_event_type)}</td>
+            <td>${escapeHtml(displayTime(node.last_seen))}</td>
+            <td>${escapeHtml(node.event_count)}</td>
+          </tr>`).join("")
+        : '<tr><td colspan="7" class="muted">No nodes have reported yet.</td></tr>';
+
+      document.getElementById("events-body").innerHTML = recent.events.length
+        ? recent.events.map(event => `
+          <tr>
+            <td>${escapeHtml(displayTime(event.received_at))}</td>
+            <td>${escapeHtml(event.node_id)}</td>
+            <td>${escapeHtml(event.event_type)}</td>
+            <td><code>${escapeHtml(JSON.stringify(event.raw_payload))}</code></td>
+          </tr>`).join("")
+        : '<tr><td colspan="4" class="muted">No events received yet.</td></tr>';
+
+      refreshStatus.className = "muted";
+      refreshStatus.textContent = `Updated ${new Date().toLocaleTimeString()} · every 2 seconds`;
+    } catch (error) {
+      refreshStatus.className = "error";
+      refreshStatus.textContent = "Dashboard API unavailable";
+      console.error(error);
+    }
+  }
+
+  refreshDashboard();
+  setInterval(refreshDashboard, 2000);
+</script>
+</body>
+</html>
