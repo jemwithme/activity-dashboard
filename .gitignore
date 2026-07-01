@@ -4,3 +4,4 @@ __pycache__/
 events.db
 events.db-shm
 events.db-wal
+tools/
