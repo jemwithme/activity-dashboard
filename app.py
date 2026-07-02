@@ -87,7 +87,8 @@ class DeviceEvent(BaseModel):
     node_id: Optional[str] = None
     device_id: Optional[str] = None
     event_type: str = "heartbeat"
-    count: int = Field(default=1, ge=1)
+    # power_on starts a new sequence at count 0; heartbeats then count upward.
+    count: int = Field(default=1, ge=0)
     raw_payload: Optional[Any] = None
     raw_event: Optional[Any] = None
 
