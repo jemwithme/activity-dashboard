@@ -1,5 +1,18 @@
 # Raspberry Pi Elderly Activity Monitor
 
+## ESP32 diagnostics
+
+The sender sketch is `esp32_sender/esp32_sender.ino` (node `LIGHT_NODE_02`,
+GPIO34 threshold `2400`). It saves the latest 48 serial lines in flash:
+startup/reset information, sensor readings, and transmitted packets with their
+local send results. Records survive resets and show boot number and uptime.
+
+To retrieve them, open Arduino Serial Monitor at **115200 baud**, select
+**Newline**, and send `logs`. Allow one loop (about five seconds, longer if
+the radio times out) for the command to run. Older lines are overwritten
+automatically. A sudden loss of power may prevent the final queued lines from
+being saved. A local send success does not confirm Pi reception.
+
 This project receives LoRa events through `lora_receiver.py`, stores them in a
 local SQLite database, and serves a simple monitoring dashboard with FastAPI.
 
